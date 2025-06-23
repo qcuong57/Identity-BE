@@ -1,0 +1,83 @@
+﻿## .NET / Visual Studio
+# Build results
+bin/
+obj/
+
+# Visual Studio user files
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.vs/
+
+# Visual Studio temporary files
+*.log
+*.tlog
+
+# Visual Studio Cache
+.vs/
+
+# Visual Studio / JetBrains Rider files
+*.sln.DotSettings
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+# Azure DevOps
+*.build.cs
+*.build.csproj
+
+# Visual Studio installer files
+*.vsix
+*.vsixmanifest
+
+# Visual Studio profiling
+*.psess
+*.vsp
+*.vspx
+
+# Visual Studio extensions
+*.vscode/
+.idea/
+
+# .NET files
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Packages
+*.nupkg
+**/packages/
+
+# User secrets
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+appsettings.json
+
+# Logs
+*.log
+logs/
+
+# Other
+*.swp
+*.tmp
+*.bak
+*.orig
+*.userosscache
+*.cache
+*.db
+*.sqlite
+*.sqlite3
+*.pdb
+*.DS_Store
+
+# Build Results
+out/
+
+# dotnet tools
+.dotnet/
+
+# Node
+node_modules/
