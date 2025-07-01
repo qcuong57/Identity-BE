@@ -84,7 +84,21 @@ namespace IdentityServer_BE.Controllers
                 return Ok(new { Message = result });
             return BadRequest(new { Message = result });
         }
-
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) 
+                return Unauthorized();
+    
+            var result = await _authService.ChangePasswordAsync(userId, model);
+    
+            if (result.Contains("successfully"))
+                return Ok(new { Message = result });
+    
+            return BadRequest(new { Message = result });
+        }
         [HttpPut("update-profile")]
         [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileModel model)

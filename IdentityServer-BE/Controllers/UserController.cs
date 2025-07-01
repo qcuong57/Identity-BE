@@ -110,5 +110,47 @@ namespace IdentityServer_BE.Controllers
             var users = await _userService.GetAllUsersAsync(pageNumber, pageSize);
             return Ok(users);
         }
+
+        [HttpPut("{userId}/change-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ChangePassword(string userId, [FromBody] ChangePasswordDto model)
+        {
+            try
+            {
+                await _userService.ChangePasswordAsync(userId, model.CurrentPassword, model.NewPassword);
+                return Ok(new { Message = "Password changed successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPut("{userId}/reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword(string userId, [FromBody] ResetPasswordDto model)
+        {
+            try
+            {
+                await _userService.ResetPasswordAsync(userId, model.NewPassword);
+                return Ok(new { Message = "Password reset successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+    }
+
+    // DTO classes for password operations
+    public class ChangePasswordDto
+    {
+        public string CurrentPassword { get; set; }
+        public string NewPassword { get; set; }
+    }
+
+    public class ResetPasswordDto
+    {
+        public string NewPassword { get; set; }
     }
 }

@@ -13,5 +13,8 @@ namespace IdentityServer_BE.Models
 
         [BsonElement("role")]
         public string Role { get; set; } = "User";
+
+        [BsonElement("address")]
+        public string? Address { get; set; }
     }
 }

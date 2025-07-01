@@ -12,5 +12,7 @@ namespace IdentityServer_BE.Services
         Task DeleteUserAsync(string userId);
         Task<UserDto> GetUserByIdAsync(string userId);
         Task<PagedUserResponseDto> GetAllUsersAsync(int pageNumber = 1, int pageSize = 10);
+        Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+        Task ResetPasswordAsync(string userId, string newPassword);
     }
 }

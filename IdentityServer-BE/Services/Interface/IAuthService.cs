@@ -12,5 +12,7 @@ namespace IdentityServer_BE.Services
         Task<bool> Verify2FACodeAsync(TwoFactorModel model);
         Task<string> ForgotPasswordAsync(string email);
         Task<string> ResetPasswordAsync(ResetPasswordModel model);
+        Task<string> ChangePasswordAsync(string userId, ChangePasswordModel model);
+
     }
 }

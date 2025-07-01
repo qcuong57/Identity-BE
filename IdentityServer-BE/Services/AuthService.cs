@@ -152,5 +152,34 @@ namespace IdentityServer_BE.Services
             }
             return string.Join(", ", result.Errors.Select(e => e.Description));
         }
+
+        public async Task<string> ChangePasswordAsync(string userId, ChangePasswordModel model)
+        {
+            var user = await _unitOfWork.UserRepository.FindByIdAsync(userId);
+            if (user == null)
+                return "User not found";
+
+            // Verify current password
+            if (!await _userManager.CheckPasswordAsync(user, model.CurrentPassword))
+                return "Current password is incorrect";
+
+            // Change to new password
+            var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+
+            if (result.Succeeded)
+            {
+                await _unitOfWork.SaveChangesAsync();
+
+                // Optional: Send notification email
+                await _emailService.SendEmailAsync(
+                    user.Email,
+                    "Password Changed",
+                    "Your password has been successfully changed.");
+
+                return "Password changed successfully";
+            }
+
+            return string.Join(", ", result.Errors.Select(e => e.Description));
+        }
     }
 }

@@ -49,9 +49,13 @@ namespace IdentityServer_BE.Services
                 PhoneNumber = model.PhoneNumber,
                 AvatarUrl = model.AvatarUrl,
                 Status = model.Status ?? "Active",
-                Role = model.Role
+                Role = model.Role,
+                Address = model.Address
             };
-            var password = GenerateRandomPassword();
+
+            // Sử dụng password được cung cấp hoặc tạo random password
+            var password = !string.IsNullOrEmpty(model.Password) ? model.Password : GenerateRandomPassword();
+            
             var result = await _userManager.CreateAsync(user, password);
             if (result.Succeeded)
             {
@@ -81,6 +85,7 @@ namespace IdentityServer_BE.Services
             user.AvatarUrl = model.AvatarUrl;
             user.Status = model.Status ?? "Active";
             user.Role = model.Role;
+            user.Address = model.Address;
 
             if (!string.IsNullOrEmpty(user.PhoneNumber) && !new System.ComponentModel.DataAnnotations.PhoneAttribute().IsValid(user.PhoneNumber))
                 throw new InvalidOperationException("Invalid phone number format");
@@ -91,6 +96,15 @@ namespace IdentityServer_BE.Services
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)
                 throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));
+
+            // Cập nhật password nếu được cung cấp
+            if (!string.IsNullOrEmpty(model.Password))
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var passwordResult = await _userManager.ResetPasswordAsync(user, token, model.Password);
+                if (!passwordResult.Succeeded)
+                    throw new InvalidOperationException(string.Join(", ", passwordResult.Errors.Select(e => e.Description)));
+            }
 
             // Cập nhật vai trò
             var currentRoles = await _userManager.GetRolesAsync(user);
@@ -145,7 +159,9 @@ namespace IdentityServer_BE.Services
                 PhoneNumber = user.PhoneNumber,
                 AvatarUrl = user.AvatarUrl,
                 Status = user.Status,
-                Role = role
+                Role = role,
+                Address = user.Address
+                // Không trả về password vì lý do bảo mật
             };
         }
 
@@ -172,7 +188,9 @@ namespace IdentityServer_BE.Services
                     PhoneNumber = user.PhoneNumber,
                     AvatarUrl = user.AvatarUrl,
                     Status = user.Status,
-                    Role = role
+                    Role = role,
+                    Address = user.Address
+                    // Không trả về password vì lý do bảo mật
                 });
             }
 
@@ -183,6 +201,33 @@ namespace IdentityServer_BE.Services
                 PageSize = pageSize,
                 TotalCount = (int)totalCount
             };
+        }
+
+        // Thêm method riêng để thay đổi password
+        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) throw new InvalidOperationException("User not found");
+
+            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            if (!result.Succeeded)
+                throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        // Thêm method để reset password (dành cho admin)
+        public async Task ResetPasswordAsync(string userId, string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) throw new InvalidOperationException("User not found");
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+            if (!result.Succeeded)
+                throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));
+
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }
