@@ -16,6 +16,6 @@
         public string Status { get; set; } = "Active";
         public string Role { get; set; } = "User";
         public string? Address { get; set; }
-        public string? Password { get; set; } // Chỉ dùng khi tạo hoặc cập nhật password
+        public string? Password { get; set; }
     }
 }

@@ -3,6 +3,7 @@ using IdentityServer_BE.Helpers;
 using IdentityServer_BE.Models;
 using IdentityServer_BE.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -44,15 +45,26 @@ builder.Services.AddSingleton<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
-builder.Services.AddScoped<JwtHelper>(); // Đổi từ AddSingleton sang AddScoped
+builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddSingleton<OtpHelper>();
+
+// Cấu hình Session
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.None; // Quan trọng cho CORS
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Yêu cầu HTTPS
+});
 
 // Cấu hình CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", builder =>
     {
-        builder.WithOrigins("http://localhost:3000")
+        builder.WithOrigins("http://localhost:3000", "https://localhost:3000")
                .AllowAnyHeader()
                .AllowAnyMethod()
                .AllowCredentials();
@@ -62,8 +74,18 @@ builder.Services.AddCors(options =>
 // Cấu hình Authentication
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = "Google";
+})
+.AddCookie(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.None; // Đảm bảo cookie hoạt động với CORS
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+    options.SlidingExpiration = true;
+    options.Cookie.Name = "IdentityServer.Auth"; // Đặt tên rõ ràng cho cookie
 })
 .AddJwtBearer(options =>
 {
@@ -82,7 +104,27 @@ builder.Services.AddAuthentication(options =>
 {
     options.ClientId = builder.Configuration["Authentication:Google:ClientId"];
     options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
-    options.CallbackPath = "/signin-google";
+    options.CallbackPath = "/api/Auth/google-callback";
+    options.SaveTokens = true;
+    options.Scope.Add("email");
+    options.Scope.Add("profile");
+    options.CorrelationCookie.SameSite = SameSiteMode.None; // Đảm bảo cookie state hoạt động với CORS
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.CorrelationCookie.HttpOnly = true;
+    options.CorrelationCookie.Name = "IdentityServer.Google.Correlation"; // Đặt tên cụ thể cho correlation cookie
+    options.Events.OnRedirectToAuthorizationEndpoint = context =>
+    {
+        Console.WriteLine($"Redirecting to Google: {context.RedirectUri}");
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRemoteFailure = context =>
+    {
+        Console.WriteLine($"OAuth failure: {context.Failure?.Message}");
+        context.Response.Redirect($"http://localhost:3000/auth-callback?error={Uri.EscapeDataString(context.Failure?.Message ?? "Unknown error")}");
+        context.HandleResponse();
+        return Task.CompletedTask;
+    };
 });
 
 builder.Services.AddControllers();
@@ -103,6 +145,7 @@ else
 
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
+app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

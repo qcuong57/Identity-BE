@@ -25,7 +25,8 @@ namespace IdentityServer_BE.Helpers
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim("PhoneNumber", user.PhoneNumber ?? ""),
                 new Claim("AvatarUrl", user.AvatarUrl ?? ""),
-                new Claim("Status", user.Status)
+                new Claim("Status", user.Status),
+                new Claim("Address", user.Address ?? "")
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));

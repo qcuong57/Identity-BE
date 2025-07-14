@@ -165,13 +165,41 @@ namespace IdentityServer_BE.Services
             };
         }
 
-        public async Task<PagedUserResponseDto> GetAllUsersAsync(int pageNumber = 1, int pageSize = 10)
+        public async Task<PagedUserResponseDto> GetAllUsersAsync(
+            int pageNumber = 1, 
+            int pageSize = 10, 
+            string search = "", 
+            string status = "")
         {
-            var filter = Builders<User>.Filter.Empty;
-            var totalCount = await _unitOfWork.UserRepository.GetCollection().CountDocumentsAsync(filter);
+            // Xây dựng filter cho MongoDB
+            var filters = new List<FilterDefinition<User>>();
+
+            // Thêm filter cho search (email hoặc phone)
+            if (!string.IsNullOrEmpty(search))
+            {
+                var searchFilter = Builders<User>.Filter.Or(
+                    Builders<User>.Filter.Regex(u => u.Email, new MongoDB.Bson.BsonRegularExpression(search, "i")),
+                    Builders<User>.Filter.Regex(u => u.PhoneNumber, new MongoDB.Bson.BsonRegularExpression(search, "i"))
+                );
+                filters.Add(searchFilter);
+            }
+
+            // Thêm filter cho status
+            if (!string.IsNullOrEmpty(status))
+            {
+                var statusFilter = Builders<User>.Filter.Eq(u => u.Status, status);
+                filters.Add(statusFilter);
+            }
+
+            // Kết hợp tất cả filters
+            var combinedFilter = filters.Count > 0 
+                ? Builders<User>.Filter.And(filters) 
+                : Builders<User>.Filter.Empty;
+
+            var totalCount = await _unitOfWork.UserRepository.GetCollection().CountDocumentsAsync(combinedFilter);
 
             var users = await _unitOfWork.UserRepository.GetCollection()
-                .Find(filter)
+                .Find(combinedFilter)
                 .Skip((pageNumber - 1) * pageSize)
                 .Limit(pageSize)
                 .ToListAsync();
