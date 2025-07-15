@@ -14,6 +14,10 @@ namespace IdentityServer_BE.Models
         public string Password { get; set; }
 
         [Phone]
-        public string? PhoneNumber { get; set; }
+        [Required] // Nếu số điện thoại là bắt buộc
+        public string PhoneNumber { get; set; }
+
+        [Required]
+        public string Address { get; set; }
     }
 }

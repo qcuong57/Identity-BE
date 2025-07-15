@@ -23,10 +23,13 @@ namespace IdentityServer_BE.Helpers
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Name, user.Email),
                 new Claim("PhoneNumber", user.PhoneNumber ?? ""),
                 new Claim("AvatarUrl", user.AvatarUrl ?? ""),
                 new Claim("Status", user.Status),
-                new Claim("Address", user.Address ?? "")
+                new Claim("Address", user.Address ?? ""),
+                new Claim(ClaimTypes.Role, user.Role ?? "User"),
+                new Claim("Role", user.Role ?? "User")
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));

@@ -43,6 +43,7 @@ namespace IdentityServer_BE.Services
                 UserName = model.Email,
                 Email = model.Email,
                 PhoneNumber = model.PhoneNumber,
+                Address = model.Address,
                 Status = "Active",
                 Role = "User"
             };

@@ -3,7 +3,6 @@ using IdentityServer_BE.Models.DTOs;
 using IdentityServer_BE.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.IO;
 
 namespace IdentityServer_BE.Controllers
 {
@@ -20,11 +19,11 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPost("create")]
-        [AllowAnonymous]
         public async Task<IActionResult> CreateUser([FromForm] UserDto model, IFormFile avatar = null)
         {
             try
             {
+                // Bỏ kiểm tra authentication thủ công vì đã có [Authorize]
                 // Xử lý file ảnh nếu có
                 string avatarUrl = null;
                 if (avatar != null)
@@ -71,7 +70,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPut("{userId}")]
-        [AllowAnonymous]
         public async Task<IActionResult> UpdateUser(string userId, [FromBody] UserDto model)
         {
             try
@@ -86,7 +84,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPut("{userId}/lock")]
-        [AllowAnonymous]
         public async Task<IActionResult> LockUser(string userId)
         {
             try
@@ -101,7 +98,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPut("{userId}/unlock")]
-        [AllowAnonymous]
         public async Task<IActionResult> UnlockUser(string userId)
         {
             try
@@ -116,7 +112,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpDelete("{userId}")]
-        [AllowAnonymous]
         public async Task<IActionResult> DeleteUser(string userId)
         {
             try
@@ -131,7 +126,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpGet("{userId}")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetUser(string userId)
         {
             try
@@ -146,19 +140,24 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpGet]
-        [AllowAnonymous]
         public async Task<IActionResult> GetAllUsers(
             int pageNumber = 1,
             int pageSize = 10,
             string search = "",
             string status = "")
         {
-            var users = await _userService.GetAllUsersAsync(pageNumber, pageSize, search, status);
-            return Ok(users);
+            try
+            {
+                var users = await _userService.GetAllUsersAsync(pageNumber, pageSize, search, status);
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
         }
 
         [HttpPut("{userId}/change-password")]
-        [AllowAnonymous]
         public async Task<IActionResult> ChangePassword(string userId, [FromBody] ChangePasswordDto model)
         {
             try
@@ -173,7 +172,6 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPut("{userId}/reset-password")]
-        [AllowAnonymous]
         public async Task<IActionResult> ResetPassword(string userId, [FromBody] ResetPasswordDto model)
         {
             try

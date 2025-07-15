@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 
 namespace IdentityServer_BE.Controllers
 {
@@ -15,15 +15,18 @@ namespace IdentityServer_BE.Controllers
         private readonly IAuthService _authService;
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
+        private readonly ILogger<AuthController> _logger;
 
         public AuthController(
             IAuthService authService,
             UserManager<User> userManager,
-            SignInManager<User> signInManager)
+            SignInManager<User> signInManager,
+            ILogger<AuthController> logger)
         {
             _authService = authService;
             _userManager = userManager;
             _signInManager = signInManager;
+            _logger = logger;
         }
 
         [HttpPost("register")]
@@ -114,169 +117,107 @@ namespace IdentityServer_BE.Controllers
             return BadRequest(new { Message = result });
         }
 
-        [HttpGet("google-login")]
-        [AllowAnonymous]
-        public IActionResult GoogleLogin(string returnUrl = null)
-        {
-            try
-            {
-                var redirectUrl = Url.Action(nameof(GoogleCallback), "Auth", new { returnUrl }, Request.Scheme);
-                var properties = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
-                properties.Items["returnUrl"] = returnUrl ?? "http://localhost:3000";
-
-                // Thêm log để kiểm tra state
-                Console.WriteLine($"Generated state: {properties.Items["state"]}");
-
-                return Challenge(properties, "Google");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Google login error: {ex.Message}");
-                return BadRequest(new { Message = $"Google login failed: {ex.Message}" });
-            }
-        }
-
-        [HttpGet("google-callback")]
-        [AllowAnonymous]
-        public async Task<IActionResult> GoogleCallback(string returnUrl = null, string remoteError = null)
-        {
-            if (remoteError != null)
-            {
-                return Content($@"
-            <script>
-                window.opener.postMessage({{
-                    success: false,
-                    message: 'Error from Google: {remoteError}'
-                }}, 'http://localhost:3000');
-                window.close();
-            </script>
-        ", "text/html");
-            }
-
-            try
-            {
-                var info = await _signInManager.GetExternalLoginInfoAsync();
-                if (info == null)
-                {
-                    return Content($@"
-                <script>
-                    window.opener.postMessage({{
-                        success: false,
-                        message: 'Error loading external login information'
-                    }}, 'http://localhost:3000');
-                    window.close();
-                </script>
-            ", "text/html");
-                }
-
-                // Kiểm tra thông tin đăng nhập
-                var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey,
-                    isPersistent: false, bypassTwoFactor: true);
-                if (!result.Succeeded)
-                {
-                    var email = info.Principal.FindFirstValue(ClaimTypes.Email);
-                    if (string.IsNullOrEmpty(email))
-                    {
-                        return Content($@"
-                    <script>
-                        window.opener.postMessage({{
-                            success: false,
-                            message: 'Email not provided by Google'
-                        }}, 'http://localhost:3000');
-                        window.close();
-                    </script>
-                ", "text/html");
-                    }
-
-                    var user = await _userManager.FindByEmailAsync(email);
-                    if (user == null)
-                    {
-                        user = new User
-                        {
-                            UserName = email,
-                            Email = email,
-                            EmailConfirmed = true,
-                            Status = "Active",
-                            Role = "User"
-                        };
-
-                        var createResult = await _userManager.CreateAsync(user);
-                        if (!createResult.Succeeded)
-                        {
-                            var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
-                            return Content($@"
-                        <script>
-                            window.opener.postMessage({{
-                                success: false,
-                                message: 'User creation failed: {errors}'
-                            }}, 'http://localhost:3000');
-                            window.close();
-                        </script>
-                    ", "text/html");
-                        }
-
-                        var addLoginResult = await _userManager.AddLoginAsync(user, info);
-                        if (!addLoginResult.Succeeded)
-                        {
-                            var errors = string.Join(", ", addLoginResult.Errors.Select(e => e.Description));
-                            return Content($@"
-                        <script>
-                            window.opener.postMessage({{
-                                success: false,
-                                message: 'External login addition failed: {errors}'
-                            }}, 'http://localhost:3000');
-                            window.close();
-                        </script>
-                    ", "text/html");
-                        }
-                    }
-
-                    // Đăng nhập lại
-                    await _signInManager.SignInAsync(user, isPersistent: false);
-                }
-
-                // Tạo JWT token
-                var token = await _authService.LoginAsync(
-                    new LoginModel { Email = info.Principal.FindFirstValue(ClaimTypes.Email), Password = null }, true);
-                if (!token.Contains("Invalid") && !token.Contains("required") && !token.Contains("not confirmed"))
-                {
-                    return Content($@"
-                <script>
-                    window.opener.postMessage({{
-                        success: true,
-                        token: '{token}',
-                        email: '{info.Principal.FindFirstValue(ClaimTypes.Email)}'
-                    }}, 'http://localhost:3000');
-                    window.close();
-                </script>
-            ", "text/html");
-                }
-                else
-                {
-                    return Content($@"
-                <script>
-                    window.opener.postMessage({{
-                        success: false,
-                        message: 'Login failed: {token}'
-                    }}, 'http://localhost:3000');
-                    window.close();
-                </script>
-            ", "text/html");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Google callback error: {ex.Message}\nStackTrace: {ex.StackTrace}");
-                return Content($@"
-            <script>
-                window.opener.postMessage({{
-                    success: false,
-                    message: 'Google callback failed: {ex.Message}'
-                }}, 'http://localhost:3000');
-                window.close();
-            </script>
-        ", "text/html");
-            }
-        }
+        // [HttpGet("google-login")]
+        // [AllowAnonymous]
+        // public IActionResult GoogleLogin(string returnUrl = null)
+        // {
+        //     try
+        //     {
+        //         var redirectUrl = Url.Action(nameof(GoogleCallback), "Auth", new { returnUrl }, Request.Scheme);
+        //         var properties = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
+        //         properties.Items["returnUrl"] = returnUrl ?? "http://localhost:3000";
+        //
+        //         _logger.LogInformation($"Initiating Google login with redirect URL: {redirectUrl}");
+        //         return Challenge(properties, "Google");
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Google login error");
+        //         return BadRequest(new { Message = "Google login failed" });
+        //     }
+        // }
+        //
+        // [HttpGet("google-callback")]
+        // [AllowAnonymous]
+        // public async Task<IActionResult> GoogleCallback(string returnUrl = null, string remoteError = null)
+        // {
+        //     try
+        //     {
+        //         if (remoteError != null)
+        //         {
+        //             _logger.LogError($"Google authentication failed: {remoteError}");
+        //             return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error={Uri.EscapeDataString(remoteError)}");
+        //         }
+        //
+        //         var info = await _signInManager.GetExternalLoginInfoAsync();
+        //         if (info == null)
+        //         {
+        //             _logger.LogError("Failed to retrieve Google login information");
+        //             return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=Failed to retrieve login information");
+        //         }
+        //
+        //         var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+        //         User user;
+        //
+        //         if (result.Succeeded)
+        //         {
+        //             user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+        //         }
+        //         else
+        //         {
+        //             var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+        //             if (string.IsNullOrEmpty(email))
+        //             {
+        //                 _logger.LogError("Google did not provide an email");
+        //                 return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=Email not provided");
+        //             }
+        //
+        //             user = await _userManager.FindByEmailAsync(email);
+        //             if (user == null)
+        //             {
+        //                 user = new User
+        //                 {
+        //                     UserName = email,
+        //                     Email = email,
+        //                     EmailConfirmed = true,
+        //                     Status = "Active",
+        //                     Role = "User"
+        //                 };
+        //                 var createResult = await _userManager.CreateAsync(user);
+        //                 if (!createResult.Succeeded)
+        //                 {
+        //                     var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+        //                     _logger.LogError($"User creation failed: {errors}");
+        //                     return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=User creation failed: {Uri.EscapeDataString(errors)}");
+        //                 }
+        //             }
+        //
+        //             var addLoginResult = await _userManager.AddLoginAsync(user, info);
+        //             if (!addLoginResult.Succeeded)
+        //             {
+        //                 var errors = string.Join(", ", addLoginResult.Errors.Select(e => e.Description));
+        //                 _logger.LogError($"Adding Google login failed: {errors}");
+        //                 return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=Adding Google login failed: {Uri.EscapeDataString(errors)}");
+        //             }
+        //
+        //             await _signInManager.SignInAsync(user, isPersistent: false);
+        //         }
+        //
+        //         var token = await _authService.LoginAsync(new LoginModel { Email = user.Email, Password = null }, true);
+        //         if (!token.Contains("Invalid") && !token.Contains("required") && !token.Contains("not confirmed"))
+        //         {
+        //             _logger.LogInformation("Google login successful, JWT token generated");
+        //             return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}");
+        //         }
+        //
+        //         _logger.LogError($"JWT token generation failed: {token}");
+        //         return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=Login failed: {Uri.EscapeDataString(token)}");
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Google callback error");
+        //         return Redirect($"{returnUrl ?? "http://localhost:3000"}/auth-callback?error=Google login failed: {Uri.EscapeDataString(ex.Message)}");
+        //     }
+        // }
     }
 }
