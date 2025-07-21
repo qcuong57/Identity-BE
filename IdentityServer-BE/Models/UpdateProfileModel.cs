@@ -9,5 +9,8 @@ namespace IdentityServer_BE.Models
 
         [Url]
         public string? AvatarUrl { get; set; }
+        
+        [Required]
+        public string Address { get; set; } = string.Empty;
     }
 }

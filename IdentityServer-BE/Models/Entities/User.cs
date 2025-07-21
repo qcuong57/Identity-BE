@@ -16,5 +16,18 @@ namespace IdentityServer_BE.Models
 
         [BsonElement("address")]
         public string? Address { get; set; }
+
+        // Thêm các trường cho 2FA OTP
+        [BsonElement("otpCode")]
+        public string? OtpCode { get; set; }
+
+        [BsonElement("otpExpiry")]
+        public DateTime? OtpExpiry { get; set; }
+
+        [BsonElement("otpAttempts")]
+        public int OtpAttempts { get; set; } = 0;
+
+        [BsonElement("otpLockoutTime")]
+        public DateTime? OtpLockoutTime { get; set; }
     }
 }

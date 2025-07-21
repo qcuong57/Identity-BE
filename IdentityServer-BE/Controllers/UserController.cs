@@ -19,47 +19,26 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> CreateUser([FromForm] UserDto model, IFormFile avatar = null)
+        [AllowAnonymous]
+        public async Task<IActionResult> CreateUser([FromBody] UserDto model)
         {
             try
             {
-                // Bỏ kiểm tra authentication thủ công vì đã có [Authorize]
-                // Xử lý file ảnh nếu có
-                string avatarUrl = null;
-                if (avatar != null)
+                if (!string.IsNullOrEmpty(model.AvatarUrl) &&
+                    !Uri.IsWellFormedUriString(model.AvatarUrl, UriKind.Absolute))
                 {
-                    // Validate file type and size
-                    var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif" };
-                    if (!allowedTypes.Contains(avatar.ContentType))
-                    {
-                        return BadRequest(new { Message = "Chỉ chấp nhận file ảnh (JPEG, PNG, GIF)" });
-                    }
-                    if (avatar.Length > 5 * 1024 * 1024) // 5MB
-                    {
-                        return BadRequest(new { Message = "Kích thước file không được vượt quá 5MB" });
-                    }
+                    return BadRequest(new { Message = "Invalid avatar URL format" });
+                }
 
-                    // Tạo tên file duy nhất
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(avatar.FileName)}";
-                    var filePath = Path.Combine("wwwroot/avatars", fileName);
-                    var fullPath = Path.Combine(Directory.GetCurrentDirectory(), filePath);
-
-                    // Đảm bảo thư mục tồn tại
-                    Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-
-                    // Lưu file
-                    using (var stream = new FileStream(fullPath, FileMode.Create))
-                    {
-                        await avatar.CopyToAsync(stream);
-                    }
-
-                    // Tạo URL cho ảnh
-                    avatarUrl = $"/avatars/{fileName}";
-                    model.AvatarUrl = avatarUrl;
+                if (string.IsNullOrEmpty(model.Email) ||
+                    !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(model.Email))
+                {
+                    return BadRequest(new { Message = "Email is invalid." });
                 }
 
                 var userId = await _userService.CreateUserAsync(model);
-                if (!string.IsNullOrEmpty(userId) && !userId.Contains("Invalid"))
+                if (!string.IsNullOrEmpty(userId) && !userId.Contains("Invalid") &&
+                    !userId.Contains("is already in use"))
                     return Ok(new { UserId = userId, Message = "User created successfully" });
                 return BadRequest(new { Message = userId });
             }
@@ -70,16 +49,46 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpPut("{userId}")]
-        public async Task<IActionResult> UpdateUser(string userId, [FromBody] UserDto model)
+        [AllowAnonymous]
+        public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto model)
         {
             try
             {
-                await _userService.UpdateUserAsync(userId, model);
+                // Validate avatar URL if provided
+                if (!string.IsNullOrEmpty(model.AvatarUrl) &&
+                    !Uri.IsWellFormedUriString(model.AvatarUrl, UriKind.Absolute))
+                {
+                    return BadRequest(new { Message = "Invalid avatar URL format" });
+                }
+
+                if (string.IsNullOrEmpty(model.Email) ||
+                    !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(model.Email))
+                {
+                    return BadRequest(new { Message = "Email is invalid." });
+                }
+
+                // Convert UpdateUserDto to UserDto
+                var userDto = new UserDto
+                {
+                    Id = userId,
+                    Email = model.Email,
+                    PhoneNumber = model.PhoneNumber,
+                    Address = model.Address,
+                    AvatarUrl = model.AvatarUrl,
+                    Role = "User",
+                    Status = "Active"
+                };
+
+                await _userService.UpdateUserAsync(userId, userDto);
                 return Ok(new { Message = "User updated successfully" });
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = $"Lỗi khi cập nhật tài khoản: {ex.Message}" });
             }
         }
 
@@ -126,6 +135,7 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpGet("{userId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetUser(string userId)
         {
             try
@@ -140,6 +150,7 @@ namespace IdentityServer_BE.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAllUsers(
             int pageNumber = 1,
             int pageSize = 10,

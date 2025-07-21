@@ -53,13 +53,11 @@ namespace IdentityServer_BE.Services
                 Address = model.Address
             };
 
-            // Sử dụng password được cung cấp hoặc tạo random password
             var password = !string.IsNullOrEmpty(model.Password) ? model.Password : GenerateRandomPassword();
-            
+    
             var result = await _userManager.CreateAsync(user, password);
             if (result.Succeeded)
             {
-                // Gán vai trò vào AspNetUserRoles
                 await _userManager.AddToRoleAsync(user, model.Role);
                 await _unitOfWork.SaveChangesAsync();
                 return user.Id;
@@ -71,7 +69,10 @@ namespace IdentityServer_BE.Services
         {
             if (model.Role != "Admin" && model.Role != "User")
                 throw new InvalidOperationException("Invalid role. Role must be 'Admin' or 'User'.");
-
+            
+            if (string.IsNullOrEmpty(model.Email) || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(model.Email))
+                throw new InvalidOperationException("Email is invalid.");
+            
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) throw new InvalidOperationException("User not found");
 
@@ -80,7 +81,6 @@ namespace IdentityServer_BE.Services
                 throw new InvalidOperationException("Email is already in use.");
 
             user.Email = model.Email;
-            user.UserName = model.Email;
             user.PhoneNumber = model.PhoneNumber;
             user.AvatarUrl = model.AvatarUrl;
             user.Status = model.Status ?? "Active";
@@ -161,7 +161,6 @@ namespace IdentityServer_BE.Services
                 Status = user.Status,
                 Role = role,
                 Address = user.Address
-                // Không trả về password vì lý do bảo mật
             };
         }
 
